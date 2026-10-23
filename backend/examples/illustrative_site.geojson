@@ -1,0 +1,12 @@
+{
+  "type": "FeatureCollection",
+  "name": "Illustrative hand-drawn site - replace with your site's measured geometry",
+  "features": [
+    {"type":"Feature","id":"boundary","properties":{"role":"boundary","name":"Illustrative cleaning area"},"geometry":{"type":"Polygon","coordinates":[[[101.6869,3.139],[101.687305,3.139],[101.687305,3.139362],[101.6869,3.139362],[101.6869,3.139]]]}},
+    {"type":"Feature","id":"access","properties":{"role":"traversable","name":"Operator-declared usable footprint"},"geometry":{"type":"Polygon","coordinates":[[[101.6869,3.139],[101.687305,3.139],[101.687305,3.139362],[101.6869,3.139362],[101.6869,3.139]]]}},
+    {"type":"Feature","id":"start","properties":{"role":"start"},"geometry":{"type":"Point","coordinates":[101.68693,3.13903]}},
+    {"type":"Feature","id":"depot","properties":{"role":"depot"},"geometry":{"type":"Point","coordinates":[101.687275,3.13903]}},
+    {"type":"Feature","id":"example-bin","properties":{"role":"bin","service_duration_sec":45,"time_window_end_min":90},"geometry":{"type":"Point","coordinates":[101.687,3.1391]}},
+    {"type":"Feature","id":"example-obstacle","properties":{"role":"exclusion","name":"Illustrative obstacle"},"geometry":{"type":"Polygon","coordinates":[[[101.68708,3.13915],[101.68715,3.13915],[101.68715,3.13922],[101.68708,3.13922],[101.68708,3.13915]]]}}
+  ]
+}

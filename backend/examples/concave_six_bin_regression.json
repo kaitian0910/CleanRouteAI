@@ -1,0 +1,175 @@
+{
+  "enable_depot_cycles": true,
+  "job_id": "concave-six-bin-regression",
+  "preserve_completed": false,
+  "use_rl": false,
+  "machine_id": "sweeper-alpha-01",
+  "start_location": {
+    "lat": 3.13962,
+    "lon": 101.68585
+  },
+  "disposal_location": {
+    "lat": 3.141021,
+    "lon": 101.68713
+  },
+  "mission_elapsed_min": 0.0,
+  "operating_boundary": {
+    "vertices": [
+      {
+        "lat": 3.140747,
+        "lon": 101.685693
+      },
+      {
+        "lat": 3.140779,
+        "lon": 101.685854
+      },
+      {
+        "lat": 3.14182,
+        "lon": 101.68573
+      },
+      {
+        "lat": 3.141921,
+        "lon": 101.686454
+      },
+      {
+        "lat": 3.140962,
+        "lon": 101.687393
+      },
+      {
+        "lat": 3.139986,
+        "lon": 101.687055
+      },
+      {
+        "lat": 3.139176,
+        "lon": 101.686926
+      },
+      {
+        "lat": 3.139075,
+        "lon": 101.687763
+      },
+      {
+        "lat": 3.138882,
+        "lon": 101.68779
+      },
+      {
+        "lat": 3.138769,
+        "lon": 101.686546
+      },
+      {
+        "lat": 3.138753,
+        "lon": 101.685977
+      },
+      {
+        "lat": 3.139209,
+        "lon": 101.685859
+      },
+      {
+        "lat": 3.139418,
+        "lon": 101.685811
+      },
+      {
+        "lat": 3.13953,
+        "lon": 101.685618
+      },
+      {
+        "lat": 3.140072,
+        "lon": 101.685741
+      }
+    ]
+  },
+  "exclusion_zones": [],
+  "tasks": [
+    {
+      "task_id": "bin-4",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.139252,
+        "lon": 101.68595
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    },
+    {
+      "task_id": "bin-5",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.139006,
+        "lon": 101.687538
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    },
+    {
+      "task_id": "bin-6",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.140062,
+        "lon": 101.686943
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    },
+    {
+      "task_id": "bin-1",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.140454,
+        "lon": 101.685902
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    },
+    {
+      "task_id": "bin-2",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.141167,
+        "lon": 101.685961
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    },
+    {
+      "task_id": "bin-3",
+      "task_type": "RUBBISH_COLLECTION",
+      "location": {
+        "lat": 3.141736,
+        "lon": 101.686229
+      },
+      "priority": 8,
+      "service_duration_sec": 45.0,
+      "time_window_start_min": 0.0,
+      "time_window_end_min": 90.0,
+      "completed": false
+    }
+  ],
+  "deduplicated_task_ids": [],
+  "kpi_policy_override": {
+    "min_coverage_percent": 92.0,
+    "max_missed_coverage_percent": 8.0,
+    "max_estimated_duration_minutes": 90.0,
+    "max_travel_distance_m": 15000.0,
+    "min_energy_reserve_percent": 20.0,
+    "max_payload_utilization_percent": 95.0,
+    "required_collection_completion_rate": 100.0,
+    "max_route_deviation_m": 5.0,
+    "max_repeated_coverage_percent": 18.0,
+    "max_depot_cycles": 32.0
+  },
+  "allow_partial_coverage_recovery": true
+}

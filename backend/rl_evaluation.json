@@ -1,0 +1,205 @@
+{
+  "evaluation": "paired-six-bin-simulation-v1",
+  "training": false,
+  "note": "Fixed simulated scenarios; not held-out G3 training evaluation or evidence of learning. Both modes use identical planner, routing fallback and KPI gates.",
+  "rows": [
+    {
+      "seed": 7,
+      "rl_requested": false,
+      "policy": {
+        "mode": "DETERMINISTIC_FALLBACK",
+        "checkpoint_loaded": false,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Deterministic baseline requested; PPO inference disabled for this plan.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.2415,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.243475,
+        "total_distance_m": 201.74,
+        "payload_utilization_percent": 84.60666666666667,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 1,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.707465,
+      "inference_ms": 0.0,
+      "planning_ms": 8.28
+    },
+    {
+      "seed": 7,
+      "rl_requested": true,
+      "policy": {
+        "mode": "TRAINED_PPO",
+        "checkpoint_loaded": true,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Frozen PPO dispatch with direct-task action restriction. Geographic features use a common-scale local grid (domain transfer); bin fill/traffic/accident inputs are explicit. Original action 7; permitted action 10. Alternate routes/depot actions are unsupported and masked; machine/window/geometry gates remain independent.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.2415,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.243475,
+        "total_distance_m": 201.74,
+        "payload_utilization_percent": 84.60666666666667,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 2,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.707465,
+      "inference_ms": 1.323,
+      "planning_ms": 3018.3
+    },
+    {
+      "seed": 42,
+      "rl_requested": false,
+      "policy": {
+        "mode": "DETERMINISTIC_FALLBACK",
+        "checkpoint_loaded": false,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Deterministic baseline requested; PPO inference disabled for this plan.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.110666666666666,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.2876125,
+        "total_distance_m": 189.97,
+        "payload_utilization_percent": 85.69333333333333,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 1,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.734263,
+      "inference_ms": 0.0,
+      "planning_ms": 7.6
+    },
+    {
+      "seed": 42,
+      "rl_requested": true,
+      "policy": {
+        "mode": "TRAINED_PPO",
+        "checkpoint_loaded": true,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Frozen PPO dispatch with direct-task action restriction. Geographic features use a common-scale local grid (domain transfer); bin fill/traffic/accident inputs are explicit. Original action 7; permitted action 10. Alternate routes/depot actions are unsupported and masked; machine/window/geometry gates remain independent.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.110666666666666,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.2876125,
+        "total_distance_m": 189.97,
+        "payload_utilization_percent": 85.69333333333333,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 2,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.734263,
+      "inference_ms": 0.308,
+      "planning_ms": 70.95
+    },
+    {
+      "seed": 99,
+      "rl_requested": false,
+      "policy": {
+        "mode": "DETERMINISTIC_FALLBACK",
+        "checkpoint_loaded": false,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Deterministic baseline requested; PPO inference disabled for this plan.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.403333333333333,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.1888375,
+        "total_distance_m": 216.31,
+        "payload_utilization_percent": 85.73333333333335,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 1,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.674307,
+      "inference_ms": 0.0,
+      "planning_ms": 8.01
+    },
+    {
+      "seed": 99,
+      "rl_requested": true,
+      "policy": {
+        "mode": "TRAINED_PPO",
+        "checkpoint_loaded": true,
+        "checkpoint": "ppo_model.zip",
+        "observation_schema": "g3-six-bin-48-v1/local-meters-v1",
+        "action_schema": "g3-dispatch-14-v1/direct-task-subset",
+        "detail": "Frozen PPO dispatch with direct-task action restriction. Geographic features use a common-scale local grid (domain transfer); bin fill/traffic/accident inputs are explicit. Original action 7; permitted action 10. Alternate routes/depot actions are unsupported and masked; machine/window/geometry gates remain independent.",
+        "training_enabled": false
+      },
+      "passed": true,
+      "metrics": {
+        "estimated_duration_minutes": 5.403333333333333,
+        "time_window_violations": 0.0,
+        "route_geometry_issues": 0.0,
+        "max_route_deviation_m": 0.0,
+        "obstacle_events": 0.0,
+        "remaining_energy_reserve_percent": 94.1888375,
+        "total_distance_m": 216.31,
+        "payload_utilization_percent": 85.73333333333335,
+        "planned_collection_assignment_percent": 100.0,
+        "collection_completion_percent": 100.0,
+        "simulated_collection_completion_percent": 0.0
+      },
+      "selected_source": "DETERMINISTIC_BASELINE",
+      "candidate_count": 2,
+      "rejected_infeasible_candidates": 0,
+      "reward": 73.674307,
+      "inference_ms": 0.307,
+      "planning_ms": 31.3
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "observation_dim": 48,
+  "action_count": 14,
+  "net_arch": [
+    64,
+    64
+  ],
+  "activation": "Tanh",
+  "num_timesteps": 16861,
+  "source": "Supplied G3 PPO checkpoint",
+  "format_version": 1
+}
