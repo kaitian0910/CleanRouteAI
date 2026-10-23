@@ -1,0 +1,11 @@
+.mission-status-strip { display: grid; grid-template-columns: repeat(3, minmax(125px, 1fr)) minmax(210px, 1.35fr); gap: 9px; margin: 4px 22px 8px; flex-shrink: 0; }
+.mission-status-metric { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 8px 13px; background: #111c2e; border: 1px solid var(--border-color, #334155); border-radius: 9px; }
+.mission-status-label { font-size: 10px; color: var(--text-muted, #94a3b8); text-transform: uppercase; letter-spacing: .05em; }
+.mission-status-metric strong { font-size: 15px; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: var(--text-main, #e2e8f0); }
+.mission-status-metric small { font-size: 10px; line-height: 1.3; color: var(--text-muted, #94a3b8); }
+.mission-status-activity strong { color: #67e8f9; }
+.mission-status-warning strong, .mission-status-activity.mission-status-warning strong { color: #fde68a; }
+.mission-status-danger strong { color: #fca5a5; }
+.mission-status-good strong { color: #6ee7b7; }
+@media (max-width: 1050px) { .mission-status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 16px; } }
+@media (max-width: 540px) { .mission-status-strip { gap: 6px; margin-inline: 10px; } .mission-status-metric { padding: 8px 10px; } .mission-status-metric strong { font-size: 13px; } }

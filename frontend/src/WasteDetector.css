@@ -1,0 +1,30 @@
+.vision-heading { min-width: 0; }
+.vision-heading p { margin: 7px 0 0; color: #a8b8cc; font-size: 12px; line-height: 1.5; }
+.vision-heading .yolo-title-group { font-size: 16px; }
+.vision-upload-action { position: relative; background: #0369a1; border-color: #38bdf8; }
+.real-detector .vision-upload-action input[type="file"] {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: 0;
+  opacity: 0; overflow: hidden;
+}
+.vision-upload-action:focus-within, .vision-options summary:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.vision-status-row {
+  flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 8px 20px;
+  padding: 10px 16px 6px; color: #cbd5e1; font-size: 13px; line-height: 1.5;
+}
+.vision-strict-setting { color: #fcd34d; }
+.vision-options { flex: 0 0 auto; margin: 0 16px 8px; color: #a8b8cc; font-size: 12px; max-height: 230px; overflow: auto; }
+.vision-options summary { cursor: pointer; width: fit-content; padding: 7px 0; }
+.vision-options > div { max-width: 740px; padding: 0 2px 6px; }
+.vision-options p { line-height: 1.6; margin: 8px 0; }
+.vision-options label { display: block; color: #e2e8f0; margin: 4px 0 8px; }
+.vision-options input[type="range"] { width: min(100%, 250px); }
+.vision-technical-status { color: #94a3b8; }
+.vision-category-summary { margin: 0 0 14px; padding: 9px 12px; border: 1px solid #334155; border-radius: 8px; background: #172235; }
+.vision-category-summary > div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; }
+.vision-category-summary dt { color: #cbd5e1; }
+.vision-category-summary dd { margin: 0; color: #38bdf8; font-weight: 700; }
+.real-detector .vision-results li { flex-direction: column; align-items: stretch; gap: 9px; padding: 12px 0; }
+.vision-results li small { display: block; margin-top: 4px; font-size: 11px; color: #94a3b8; }
+.vision-category-badge { width: fit-content; padding: 4px 8px; border-radius: 5px; background: #064e3b; color: #a7f3d0; font-size: 12px; }
+.vision-category-others { background: #422f13; color: #fde68a; }
+.vision-results .vision-count-note { color: #a8b8cc; font-size: 12px; }

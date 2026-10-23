@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>CleanRoute AI native browser execution check</title>
+<body><h1>Native browser execution check</h1><pre id="result" data-status="running">Running…</pre>
+<script type="module">
+import { RouteExecutionSession } from '/src/routeExecution.ts';
+const result = document.querySelector('#result');
+const api = new URLSearchParams(location.search).get('api');
+const token = 'dev-operator-token';
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+const point = (x, y) => ({ lat: 3.139 + y / 110540, lon: 101.6869 + x / (111320 * Math.cos(3.139 * Math.PI / 180)) });
+const polygon = (x1, y1, x2, y2) => ({ vertices: [point(x1,y1), point(x2,y1), point(x2,y2), point(x1,y2)] });
+const session = new RouteExecutionSession(api, token); // Real Window.fetch; no injected mock.
+const log = [];
+function run(route, stopAfterCollection = false) {
+  return new Promise((resolve, reject) => session.start(route, snapshot => {
+    log.push({ state: snapshot.metrics.execution_state, completed: snapshot.route.segments.filter(s => s.completed).length });
+    if (stopAfterCollection && snapshot.route.tasks.some(t => t.completed)) {
+      session.stop(); resolve(snapshot);
+    } else if (snapshot.metrics.execution_state === 'COMPLETED') resolve(snapshot);
+  }, reject, 0));
+}
+try {
+  const request = {
+    job_id: `native-browser-${crypto.randomUUID()}`, use_rl: false, enable_depot_cycles: true,
+    start_location: point(3,3), disposal_location: point(47,3), operating_boundary: polygon(0,0,50,40),
+    environment_map: { map_id: 'isolated-browser-test', features: [] },
+    tasks: [{ task_id: 'browser-bin', task_type: 'RUBBISH_COLLECTION', location: point(9,9),
+      service_duration_sec: 30, time_window_start_min: 0, time_window_end_min: 90 }],
+  };
+  let route = await session.json('/routes/plan', request);
+  const firstPlanRevision = route.route_version;
+  assert(firstPlanRevision === 1, 'First planning request counted its alternatives as route versions');
+  assert(route.kpi_evaluation.passed, `Initial plan failed: ${JSON.stringify(route.kpi_evaluation.failed_constraints)}`);
+  route = await session.json(`/routes/${route.route_id}/approve`, {});
+  const beforeReplan = await run(route, true);
+  await session.settle();
+  const completedIds = beforeReplan.route.segments.filter(s => s.completed).map(s => s.segment_id);
+  request.preserve_completed = true;
+  request.exclusion_zones = [{ zone_id: 'browser-obstacle', name: 'New obstacle', polygon: polygon(23,20,28,25) }];
+  route = await session.json('/routes/plan', request);
+  assert(route.route_version === firstPlanRevision + 1, 'An obstacle replan did not advance exactly one revision');
+  assert(route.kpi_evaluation.passed, `Replan failed: ${JSON.stringify(route.kpi_evaluation.failed_constraints)}`);
+  assert(completedIds.every(id => route.segments.some(s => s.segment_id === id && s.completed)), 'Replan lost finished work');
+  assert(route.tasks.some(t => t.task_id === 'browser-bin' && t.completed), 'Replan lost completed bin');
+  const rechargeCount = route.segments.filter(s => s.segment_type === 'DEPOT_RECHARGE').length;
+  assert(rechargeCount > 0, 'Fixture did not schedule a recharge');
+  route = await session.json(`/routes/${route.route_id}/approve`, {});
+  const finished = await run(route);
+  await session.settle();
+  assert(finished.route.segments.every(s => s.completed), 'Unfinished route segments');
+  assert(finished.route.tasks.every(t => t.completed), 'Unfinished collections');
+  const finalFrame = finished.metrics.telemetry_frames.at(-1);
+  assert(finalFrame.battery_percent >= 20, 'Battery reserve was breached');
+  assert(finished.route.segments.filter(s => s.segment_type === 'DEPOT_RECHARGE').every(s => s.completed), 'Missed recharge');
+  assert(Math.abs(finalFrame.position.lat - route.disposal_depot.lat) < 0.00001 && Math.abs(finalFrame.position.lon - route.disposal_depot.lon) < 0.00001, 'Final position is not the depot');
+  // Use the actual bundled shoreline, independently of the raster background.
+  const mappedEnvironment = await session.json('/environment/features');
+  assert(mappedEnvironment.features.some(feature => feature.feature_id === 'water-osm-relation-8429206-39923096'
+    && feature.polygon.vertices.length > 100), 'Detailed mapped lake outline was not supplied');
+  const shoreRequest = {
+    job_id: `native-water-${crypto.randomUUID()}`, use_rl: false, enable_depot_cycles: true,
+    start_location: { lat: 3.14063, lon: 101.68582 }, disposal_location: { lat: 3.14077, lon: 101.68582 },
+    operating_boundary: { vertices: [{ lat: 3.1406, lon: 101.6856 }, { lat: 3.1406, lon: 101.68585 },
+      { lat: 3.1408, lon: 101.68585 }, { lat: 3.1408, lon: 101.6856 }] },
+    // A mistakenly incomplete imported map must not remove known water.
+    environment_map: { map_id: 'mistakenly-empty-water-layer', features: [] }, tasks: [],
+  };
+  const shorePlan = await session.json('/routes/plan', shoreRequest);
+  assert(shorePlan.kpi_evaluation.passed && shorePlan.segments.some(segment => segment.segment_type === 'SWEEP_SWATH'),
+    `Dry land beside water did not produce a valid plan: ${shorePlan.route_safety_issues}`);
+  assert(shorePlan.inaccessible_area_m2 > 100 && shorePlan.effective_eligible_area_m2 < shorePlan.requested_area_m2 - 100,
+    'The lake overlap was not excluded from the requested area');
+  assert(shorePlan.planning_environment_map.water_map_version === mappedEnvironment.water_map_version,
+    'An imported map suppressed the mandatory water snapshot');
+  let unsafePinError = '';
+  try {
+    await session.json('/routes/plan', { ...shoreRequest, job_id: `native-water-pin-${crypto.randomUUID()}`,
+      disposal_location: { lat: 3.1407, lon: 101.6855 } });
+  } catch (error) { unsafePinError = error.message; }
+  assert(unsafePinError.includes('inside water') && unsafePinError.includes('dry land'),
+    'A mistakenly placed water depot was silently relocated or approved');
+  const app = document.createElement('iframe');
+  app.title = 'Real-time application preview'; app.src = '/'; app.width = '1400'; app.height = '900';
+  document.body.append(app);
+  await new Promise((resolve, reject) => {
+    let checks = 0;
+    const check = () => {
+      const card = app.contentDocument?.querySelector('.waste-cell-others');
+      if (card?.textContent.includes('Others') && card.textContent.includes('0 items')) resolve();
+      else if (checks++ < 400) setTimeout(check, 25);
+      else reject(new Error('Real-time application did not render the Others collection card'));
+    };
+    check();
+  });
+  // Exercise the actual App controls: import a small site, finish a job, then
+  // click its Feedback repeat action. No component state or API mocks are used.
+  const appDoc = () => app.contentDocument;
+  assert(appDoc().querySelectorAll('.mission-status-strip .mission-status-metric').length === 4,
+    'Compact mission overview did not render four resource/activity cards');
+  const waitFor = (read, message, checks = 1800) => new Promise((resolve, reject) => {
+    const check = () => {
+      const value = read();
+      if (value) resolve(value);
+      else if (checks-- > 0) setTimeout(check, 50);
+      else reject(new Error(`${message}: ${appDoc()?.querySelector('.stage-status-msg')?.textContent}`));
+    };
+    check();
+  });
+  const button = (text, root = appDoc()) => [...root.querySelectorAll('button')].find(item => item.textContent.includes(text));
+  const currentRouteId = () => appDoc().body.textContent.match(/route-[0-9a-f]{8}/)?.[0];
+  const feature = (role, geometry, properties = {}) => ({ type: 'Feature', properties: { role, ...properties }, geometry });
+  const ring = polygon(40,0,52,8).vertices.map(p => [p.lon,p.lat]); ring.push(ring[0]);
+  const geoPoint = (x,y) => { const p = point(x,y); return { type: 'Point', coordinates: [p.lon,p.lat] }; };
+  const site = { type: 'FeatureCollection', features: [
+    feature('boundary', { type: 'Polygon', coordinates: [ring] }),
+    feature('traversable', { type: 'Polygon', coordinates: [ring] }),
+    feature('start', geoPoint(43,3)), feature('depot', geoPoint(49,3)),
+    feature('bin', geoPoint(45,4), { service_duration_sec: 30, time_window_end_min: 90 }),
+  ] };
+  appDoc().querySelector('.advanced-planning-inputs').open = true;
+  const input = await waitFor(() => appDoc().querySelector('input[aria-label="Actual site file"]'), 'Site input did not open');
+  const files = new app.contentWindow.DataTransfer();
+  files.items.add(new app.contentWindow.File([JSON.stringify(site)], 'browser-repeat.geojson', { type: 'application/geo+json' }));
+  input.files = files.files;
+  input.dispatchEvent(new app.contentWindow.Event('change', { bubbles: true }));
+  (await waitFor(() => button('Apply site to map'), 'Site preview did not load')).click();
+  await waitFor(() => appDoc().querySelector('.stage-status-msg')?.textContent.includes('site applied'), 'Site was not applied');
+  const referenceLayers = [...appDoc().querySelectorAll('label')].find(label => label.textContent.includes('Show Reference Terrain'))?.querySelector('input');
+  assert(referenceLayers, 'Reference layer toggle is missing');
+  if (referenceLayers.checked) referenceLayers.click();
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Route').click();
+  await waitFor(() => appDoc().querySelectorAll('.leaflet-water-safety-pane .water-safety-exclusion').length >= 17,
+    'Water exclusions disappeared when reference layers were turned off');
+  // Short screens must scroll the workspace instead of clipping its map.
+  app.height = '600';
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const workspace = appDoc().querySelector('.main-stage');
+  const mapHolder = appDoc().querySelector('.route-map-holder');
+  assert(workspace.scrollHeight > workspace.clientHeight, 'Short screen has no scrollable workspace');
+  assert(mapHolder.getBoundingClientRect().height >= 460, 'Route map collapsed to fit the screen');
+  assert(mapHolder.querySelector('.leaflet-container').getBoundingClientRect().height >= 460,
+    'Visible map canvas collapsed inside its scrolling holder');
+  workspace.scrollTop = workspace.scrollHeight;
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const scrollBounds = workspace.getBoundingClientRect();
+  assert(workspace.scrollTop > 0 && mapHolder.getBoundingClientRect().bottom <= scrollBounds.bottom + 1,
+    'Scrolling does not reveal the bottom of the route map');
+  workspace.scrollTop = 0;
+  app.height = '900';
+  button('Sweep + Bins').click();
+  (await waitFor(() => button('Approve & Run'), 'App did not produce a valid route')).click();
+  await waitFor(() => appDoc().querySelector('.stage-status-msg')?.textContent.includes('Cleaning is in progress'), 'App did not start cleaning');
+  workspace.scrollTop = workspace.scrollHeight;
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Feedback').click();
+  await waitFor(() => appDoc().querySelector('.feedback-outcome')?.textContent.includes('Cleaning is in progress'), 'Feedback does not show running state');
+  assert(workspace.scrollTop === 0, 'Switching sections did not return the workspace to the top');
+  assert(!appDoc().querySelector('.feedback-outcome').textContent.includes('Cleaning is paused'), 'Per-step backend pause was displayed as a user pause');
+  await waitFor(() => appDoc().querySelector('.feedback-outcome')?.textContent.includes('This run is finished'), 'First App run did not complete');
+  const firstAppId = currentRouteId();
+  assert(firstAppId, 'Completed App route ID missing');
+  const firstAppRun = await session.snapshot(firstAppId);
+  assert(firstAppRun.metrics.execution_state === 'COMPLETED', 'App completion did not match server');
+  assert(appDoc().querySelector('.mission-status-strip')?.textContent.includes('Cleaning finished'), 'Mission overview did not show completion');
+  const savedReserve = firstAppRun.route.kpi_policy_snapshot.min_energy_reserve_percent;
+  assert(appDoc().querySelector('.mission-status-strip')?.textContent.includes(`Minimum reserve ${savedReserve}%`),
+    'Mission overview did not use the saved plan reserve');
+  const checksTab = appDoc().querySelector('#feedback-tab-checks');
+  checksTab.click();
+  await waitFor(() => appDoc().querySelector('#feedback-section-checks .plan-check-grid'), 'Plan checks tab did not open');
+  assert(checksTab.getAttribute('aria-selected') === 'true', 'Selected plan checks tab is not announced');
+  assert(appDoc().querySelector('#feedback-section-checks')?.textContent.includes(`Required reserve: ${savedReserve}%`),
+    'Plan checks used a sample reserve instead of the saved plan limit');
+  assert(appDoc().querySelector('#feedback-section-checks')?.textContent.includes(`Limit: ${firstAppRun.route.kpi_policy_snapshot.max_estimated_duration_minutes} min per outing`),
+    'Plan checks did not use the configured outing time limit');
+  assert(appDoc().querySelector('.feedback-decision')?.textContent.includes('Plan used for this completed run'),
+    'Latest decision did not distinguish a completed plan');
+  checksTab.dispatchEvent(new app.contentWindow.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  await waitFor(() => appDoc().querySelector('#feedback-section-tasks .plan-task-list'), 'Keyboard navigation did not open task review');
+  const reviewedTasks = appDoc().querySelectorAll('.plan-task-list > li');
+  assert(reviewedTasks.length === firstAppRun.route.tasks.length && [...reviewedTasks].every(row => row.querySelector('.plan-check-status')?.textContent === 'Finished'),
+    'Task review did not reflect completed backend collections');
+  appDoc().querySelector('#feedback-tab-tasks').dispatchEvent(new app.contentWindow.KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+  await waitFor(() => appDoc().querySelector('#feedback-section-summary .feedback-outcome'), 'Keyboard navigation did not restore Summary');
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Feedback').click();
+  const repeatButton = await waitFor(() => appDoc().querySelector('.feedback-run-again'), 'Feedback repeat action is missing');
+  const technical = appDoc().querySelector('.feedback-technical');
+  assert(technical && !technical.open, 'Technical details are not collapsed by default');
+  assert(appDoc().querySelector('.feedback-outcome').textContent.includes('This run is finished'), 'Plain completion result missing');
+  assert([...appDoc().querySelectorAll('.feedback-badge')].some(item => item.textContent === 'Used for this completed run'), 'Selected option retained a stale approval badge');
+  assert(appDoc().querySelector('.feedback-examples') && !appDoc().querySelector('.feedback-examples').open, 'Examples are not collapsed by default');
+  repeatButton.click(); repeatButton.click(); // A fast second click must not create another job.
+  await waitFor(() => currentRouteId() && currentRouteId() !== firstAppId, 'Repeat did not create a fresh route');
+  await waitFor(() => appDoc().querySelector('.completed-run-banner'), 'Repeated App run did not complete');
+  const secondAppId = currentRouteId();
+  const secondAppRun = await session.snapshot(secondAppId);
+  assert(secondAppRun.metrics.execution_state === 'COMPLETED', 'Repeated App job did not finish');
+  assert(secondAppRun.route.repeat_of_route_id === firstAppId && secondAppRun.route.job_id !== firstAppRun.route.job_id, 'Repeat reused the previous job');
+  assert(secondAppRun.route.tasks.every(task => task.completed) && secondAppRun.route.segments.every(segment => segment.completed), 'Repeat skipped work');
+  assert(secondAppRun.route.repeat_comparison?.candidates_checked > 1, 'Repeat did not report fresh alternative evaluations');
+  assert(secondAppRun.route.repeat_comparison.history_applied, 'Repeated ordinary bins did not reuse their history hint');
+  const history = await session.json('/feedback/history');
+  assert(history.records.filter(item => item.job_id === secondAppRun.route.job_id && item.status === 'COMPLETED_SIMULATION').length === 1, 'Repeat created duplicate completion records');
+  assert(JSON.stringify((await session.snapshot(firstAppId)).route) === JSON.stringify(firstAppRun.route), 'Repeat rewrote prior results');
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Logs & changes').click();
+  await waitFor(() => appDoc().querySelector('.feedback-revision-list > li'), 'Published planning history did not load');
+  assert(appDoc().querySelectorAll('.feedback-revision-list > li').length === 1, 'Internal options were listed as separate revisions');
+  assert(appDoc().querySelector('.feedback-revision-list h3').textContent === 'Plan 1', 'Fresh repeat job did not start at Plan 1');
+  assert(appDoc().querySelector('.feedback-plan-options') && !appDoc().querySelector('.feedback-plan-options').open, 'Checked alternatives are not collapsed');
+  assert(appDoc().querySelector('.feedback-raw-audit') && !appDoc().querySelector('.feedback-raw-audit').open, 'Raw state events are not collapsed');
+  assert(appDoc().querySelector('.feedback-timeline .feedback-event time[datetime]'), 'Activity timeline has no recorded timestamp');
+  assert([...appDoc().querySelectorAll('.feedback-event-badge')].some(item => item.textContent === 'Finished'),
+    'Activity timeline did not show the recorded completion event');
+  // Delay delivery of a real repeat response, then press the actual E-Stop.
+  // Releasing that response must not approve or execute the prepared job.
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Feedback').click();
+  const nextRepeat = await waitFor(() => appDoc().querySelector('.feedback-run-again'), 'Second completion has no repeat action');
+  assert(appDoc().querySelector('.feedback-repeat-comparison')?.textContent.includes('This run was planned again'), 'Feedback is missing the repeat explanation');
+  const nativeAppFetch = app.contentWindow.fetch.bind(app.contentWindow);
+  let releaseRepeat, heldCandidate;
+  app.contentWindow.fetch = async (input, init) => {
+    const response = await nativeAppFetch(input, init);
+    if (String(input).endsWith('/repeat')) {
+      heldCandidate = await response.clone().json();
+      await new Promise(resolve => { releaseRepeat = resolve; });
+    }
+    return response;
+  };
+  nextRepeat.click();
+  await waitFor(() => releaseRepeat, 'Prepared repeat response was not received');
+  button('E-Stop').click();
+  await waitFor(() => appDoc().querySelector('.stage-status-msg')?.textContent.includes('Emergency stop recorded'), 'E-Stop was not recorded');
+  releaseRepeat();
+  await new Promise(resolve => setTimeout(resolve, 250));
+  const stoppedPreparation = await session.snapshot(heldCandidate.route_id);
+  assert(!stoppedPreparation.route.approved_by && stoppedPreparation.route.segments.every(segment => !segment.completed), 'A delayed repeat response started after E-Stop');
+  app.contentWindow.fetch = nativeAppFetch;
+  // Check the real detector through the ordinary photo workflow, including an
+  // explicitly chosen strict score and the operator's reset-and-recheck action.
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Real-time').click();
+  const visionSettings = appDoc().querySelector('.vision-options');
+  assert(visionSettings && !visionSettings.open, 'YOLO tuning is not collapsed by default');
+  assert(appDoc().querySelector('#vision-confidence').value === '0.25', 'YOLO default score changed');
+  visionSettings.open = true;
+  const confidence = appDoc().querySelector('#vision-confidence');
+  Object.getOwnPropertyDescriptor(app.contentWindow.HTMLInputElement.prototype, 'value').set.call(confidence, '0.95');
+  confidence.dispatchEvent(new app.contentWindow.Event('input', { bubbles: true }));
+  await waitFor(() => appDoc().querySelector('.vision-strict-setting')?.textContent.includes('95%'), 'Strict score control did not update');
+  const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 240;
+  const context = canvas.getContext('2d'); context.fillStyle = 'white'; context.fillRect(0,0,320,240);
+  const blank = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  const photos = new app.contentWindow.DataTransfer();
+  photos.items.add(new app.contentWindow.File([blank], 'empty-test-scene.png', { type: 'image/png' }));
+  const photoInput = appDoc().querySelector('input[aria-label="Upload litter image"]'); photoInput.files = photos.files;
+  photoInput.dispatchEvent(new app.contentWindow.Event('change', { bubbles: true }));
+  await waitFor(() => button('Use default setting and check again'), 'Strict image inference did not return the reset action');
+  assert(appDoc().querySelector('.vision-results').textContent.includes('No items found'), 'Empty image fabricated litter');
+  button('Use default setting and check again').click();
+  await waitFor(() => appDoc().querySelector('#vision-confidence')?.value === '0.25'
+    && appDoc().querySelector('.vision-results')?.textContent.includes('No items found')
+    && !appDoc().querySelector('.vision-results')?.textContent.includes('minimum score of 95%'), 'Default score was not applied to a new image check');
+  // A deterministic response fixture exercises nonempty UI classification;
+  // actual blank-image YOLO inference above remains an independent check.
+  const pickupsBeforeClassification = appDoc().querySelector('.completed-pickup-summary').textContent;
+  const tasksBeforeClassification = (await session.json(`/routes/${secondAppId}`)).tasks;
+  const detection = (id, waste_class, confidence) => ({ detection_id: id, waste_class, confidence,
+    image_bbox: { x: .1, y: .1, width: .15, height: .15 } });
+  let fixtureDetections = [detection('fixture-bottle', 'Bottle', .9), detection('fixture-paper', 'Paper & Cardboard', .9),
+    detection('fixture-unsure', 'Can', .4), detection('fixture-unknown', 'Unknown material', .95), detection('fixture-cup', 'Cup', .99)];
+  let fixtureRequests = 0;
+  app.contentWindow.fetch = async (input, init) => {
+    if (!String(input).includes('/api/vision/detect')) return nativeAppFetch(input, init);
+    fixtureRequests++;
+    return new app.contentWindow.Response(JSON.stringify({ model: `browser-classification-fixture-${fixtureRequests}`, image_width: 320,
+      image_height: 240, inference_ms: 1, detections: fixtureDetections }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const categoryText = selector => appDoc().querySelector(selector + ' .waste-cell-val')?.textContent;
+  button('Check photo again').click();
+  await waitFor(() => categoryText('.waste-cell-plastic') === '1 items' && categoryText('.waste-cell-paper') === '1 items'
+    && categoryText('.waste-cell-others') === '3 items', 'YOLO detections did not directly update category cards');
+  assert(!appDoc().querySelector('.real-detector').textContent.includes('Confirm location on map'), 'YOLO still requires a map pin');
+  assert(appDoc().querySelector('.nav-switch-btn.active strong').textContent === 'Real-time', 'Classifying changed to the route map');
+  button('Check photo again').click();
+  await waitFor(() => appDoc().querySelector('.vision-technical-status')?.textContent.includes('browser-classification-fixture-2')
+    && !button('Check photo again').disabled && categoryText('.waste-cell-others') === '3 items', 'Rechecking accumulated image counts');
+  assert(categoryText('.waste-cell-plastic') === '1 items', 'Rechecking doubled recognized objects');
+  fixtureDetections = [];
+  button('Check photo again').click();
+  await waitFor(() => appDoc().querySelector('.vision-technical-status')?.textContent.includes('browser-classification-fixture-3')
+    && !button('Check photo again').disabled && categoryText('.waste-cell-plastic') === '0 items' && categoryText('.waste-cell-paper') === '0 items'
+    && categoryText('.waste-cell-others') === '0 items', 'An empty result did not replace previous counts');
+  assert(appDoc().querySelector('.completed-pickup-summary').textContent === pickupsBeforeClassification, 'Image checks changed completed job totals');
+  assert(JSON.stringify((await session.json(`/routes/${secondAppId}`)).tasks) === JSON.stringify(tasksBeforeClassification), 'Image checks created map collection tasks');
+  button('Clear image & counts').click();
+  await waitFor(() => !appDoc().querySelector('.vision-image-frame') && categoryText('.waste-cell-others') === '0 items', 'Clearing an image retained classification counts');
+  app.contentWindow.fetch = nativeAppFetch;
+  // A separate console uses the other simulated machine, pauses it, then clears
+  // the map. The backend job must be cancelled before the UI forgets it.
+  const cancellationApp = document.createElement('iframe'); cancellationApp.src = '/';
+  cancellationApp.title = 'Confirmed cancellation workflow'; document.body.append(cancellationApp);
+  const cancelDoc = () => cancellationApp.contentDocument;
+  await waitFor(() => cancelDoc()?.querySelector('.waste-cell-others'), 'Cancellation console did not load');
+  const machineSelect = cancelDoc().querySelector('#machine-id-select');
+  machineSelect.value = 'heavy-utility-02';
+  machineSelect.dispatchEvent(new cancellationApp.contentWindow.Event('change', { bubbles: true }));
+  cancelDoc().querySelector('.advanced-planning-inputs').open = true;
+  const siteInput = await waitFor(() => cancelDoc().querySelector('input[aria-label="Actual site file"]'), 'Cancellation site input missing');
+  const cancelFiles = new cancellationApp.contentWindow.DataTransfer();
+  cancelFiles.items.add(new cancellationApp.contentWindow.File([JSON.stringify(site)], 'cancel-site.geojson', { type: 'application/geo+json' }));
+  siteInput.files = cancelFiles.files;
+  siteInput.dispatchEvent(new cancellationApp.contentWindow.Event('change', { bubbles: true }));
+  (await waitFor(() => button('Apply site to map', cancelDoc()), 'Cancellation site preview missing')).click();
+  await waitFor(() => cancelDoc().querySelector('.stage-status-msg')?.textContent.includes('site applied'), 'Cancellation site was not applied');
+  button('Sweep + Bins', cancelDoc()).click();
+  (await waitFor(() => button('Approve & Run', cancelDoc()), 'Cancellation plan did not pass')).click();
+  await waitFor(() => cancelDoc().querySelector('.stage-status-msg')?.textContent.includes('Cleaning is in progress'), 'Cancellation job did not start');
+  button('Pause', cancelDoc()).click();
+  await waitFor(() => cancelDoc().querySelector('.stage-status-msg')?.textContent.includes('Simulation paused'), 'User pause was not confirmed');
+  const cancelledId = cancelDoc().body.textContent.match(/route-[0-9a-f]{8}/)?.[0];
+  assert(cancelledId, 'Paused cancellation route is missing');
+  button('Clear Map', cancelDoc()).click();
+  await waitFor(() => cancelDoc().querySelector('.stage-status-msg')?.textContent.includes('Map cleared'), 'Clear Map did not confirm cancellation');
+  assert((await session.snapshot(cancelledId)).metrics.execution_state === 'ABORTED', 'Clear Map abandoned a reserved backend job');
+  // Leave a representative view visible in the optional headless screenshot.
+  [...appDoc().querySelectorAll('.nav-switch-btn')].find(item => item.querySelector('strong')?.textContent === 'Feedback').click();
+  (await waitFor(() => appDoc().querySelector('#feedback-tab-checks'), 'Final Feedback preview did not load')).click();
+  await waitFor(() => appDoc().querySelector('#feedback-section-checks .plan-check-grid'), 'Final Plan checks preview did not load');
+  app.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:10;background:#0b1220';
+  result.dataset.status = 'passed';
+  result.textContent = JSON.stringify({ status: 'passed', nativeFetch: true, collection: true, obstacleReplan: true,
+    othersCardRendered: true, feedbackSimplified: true, appRepeatCompleted: true, priorResultsRetained: true, stopCancelsPendingRepeat: true,
+    liveFeedbackStateCorrect: true, repeatHistoryRechecked: true, actualYoloInference: true, strictYoloScoreReset: true,
+    oneRevisionPerPlanRequest: true, groupedPlanningHistory: true, correctCompletedOptionBadge: true,
+    clearMapCancelsBackendJob: true, compactMissionOverview: true, savedPlanLimitsShown: true,
+    mappedWaterAutomaticallyExcluded: true, waterDepotRejected: true, waterOverlayIndependent: true,
+    shortScreenWorkspaceScrolls: true, mapBottomReachable: true,
+    taskReviewMatchesBackend: true, accessibleFeedbackTabs: true, timestampedActivityTimeline: true,
+    directClassificationFixture: true, uncertainVisionToOthers: true, imageRechecksDoNotAccumulate: true,
+    visionAddsNoMapTasks: true, completedPickupsRetained: true,
+    repeatCompletedSteps: secondAppRun.route.segments.length, rechargeCount, completedSteps: finished.route.segments.length, elapsedMinutes: finalFrame.mission_elapsed_min,
+    batteryPercent: finalFrame.battery_percent, updates: log.length }, null, 2);
+} catch (error) {
+  session.stop(); result.dataset.status = 'failed'; result.textContent = error.stack || String(error);
+}
+</script></body></html>
